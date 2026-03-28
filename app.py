@@ -2,7 +2,7 @@ import os
 from flask import Flask
 from binance.client import Client
 import pandas as pd
-import pandas_ta as ta
+
 
 app = Flask(__name__)
 
