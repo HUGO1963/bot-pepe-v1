@@ -30,7 +30,7 @@ PRECIO_MAX = 0.00001250
 data_bot = {"precio": 0, "rsi": 0, "estado": "Iniciando...", "saldo": 0}
 en_posicion = False
 
-# FUNCIÓN RSI MANUAL (Sustituye a pandas_ta para evitar errores)
+# RSI
 def calcular_rsi(cierres, periodo=14):
     delta = cierres.diff()
     ganancia = delta.clip(lower=0)
@@ -41,9 +41,10 @@ def calcular_rsi(cierres, periodo=14):
     rsi = 100 - (100 / (1 + rs))
     return rsi.iloc[-1]
 
-# MOTOR DEL BOT
+# MOTOR
 def motor():
     global en_posicion
+
     while True:
         try:
             balance = exchange.fetch_balance()
@@ -53,7 +54,7 @@ def motor():
             bars = exchange.fetch_ohlcv(SYMBOL, timeframe=TIMEFRAME, limit=50)
             df = pd.DataFrame(bars, columns=['t','o','h','l','c','v'])
 
-            precio = df['c'].iloc[-1]
+            precio = float(df['c'].iloc[-1])
             rsi_val = calcular_rsi(df['c'])
 
             if pd.isna(rsi_val):
@@ -68,6 +69,7 @@ def motor():
             # CONTROL DE RANGO
             if precio < PRECIO_MIN or precio > PRECIO_MAX:
                 data_bot["estado"] = "FUERA DE RANGO - PROTECCIÓN"
+
                 if en_posicion and pepe > 0:
                     try:
                         exchange.create_market_sell_order(SYMBOL, pepe)
@@ -75,8 +77,9 @@ def motor():
                         data_bot["estado"] = "VENTA FUERA RANGO"
                     except:
                         data_bot["estado"] = "ERROR VENTA RANGO"
+
             else:
-                # LÓGICA RSI 30/70
+                # RSI 30 / 70
                 if rsi_val <= 30 and not en_posicion and usdt >= MONTO_USDT:
                     cantidad = MONTO_USDT / precio
                     try:
@@ -85,6 +88,7 @@ def motor():
                         data_bot["estado"] = "COMPRADO"
                     except:
                         data_bot["estado"] = "ERROR COMPRA"
+
                 elif rsi_val >= 70 and en_posicion and pepe > 0:
                     try:
                         exchange.create_market_sell_order(SYMBOL, pepe)
@@ -92,11 +96,12 @@ def motor():
                         data_bot["estado"] = "VENDIDO"
                     except:
                         data_bot["estado"] = "ERROR VENTA"
+
                 else:
                     data_bot["estado"] = "EN RANGO - CAZANDO"
 
         except Exception as e:
-            data_bot["estado"] = "ERROR CONEXIÓN COINEX"
+            data_bot["estado"] = str(e)
 
         time.sleep(30)
 
@@ -116,6 +121,7 @@ def home():
     </body>
     """
 
+# INICIO
 threading.Thread(target=motor, daemon=True).start()
 
 if __name__ == "__main__":
