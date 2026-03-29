@@ -7,16 +7,14 @@ from flask import Flask
 
 app = Flask(__name__)
 
-# ⚠️ SIN API (MODO SEGURO)
+# SIN API (modo seguro)
 exchange = ccxt.binance({
     'enableRateLimit': True,
 })
 
-# CONFIG
 SYMBOL = 'BTC/USDT'
 TIMEFRAME = '1m'
 
-# ESTADO
 data_bot = {"precio": 0, "rsi": 0, "estado": "Iniciando..."}
 
 # RSI
@@ -34,6 +32,8 @@ def calcular_rsi(cierres, periodo=14):
 def motor():
     while True:
         try:
+            data_bot["estado"] = "Conectando..."
+
             bars = exchange.fetch_ohlcv(SYMBOL, timeframe=TIMEFRAME, limit=50)
             df = pd.DataFrame(bars, columns=['t','o','h','l','c','v'])
 
@@ -42,7 +42,7 @@ def motor():
 
             if pd.isna(rsi_val):
                 data_bot["estado"] = "Calculando..."
-                time.sleep(10)
+                time.sleep(5)
                 continue
 
             data_bot["precio"] = precio
@@ -56,25 +56,9 @@ def motor():
                 data_bot["estado"] = "ESPERANDO"
 
         except Exception as e:
-            data_bot["estado"] = str(e)
+            data_bot["estado"] = "ERROR: " + str(e)
 
         time.sleep(20)
 
-# WEB
-@app.route('/')
-def home():
-    return f"""
-    <body style="background-color:black; color:#00FF00; font-family:monospace; text-align:center; padding-top:50px;">
-        <h1 style="color:gold;">🦅 AGUILA BOT - SEGURO</h1>
-        <h2>PRECIO BTC: {data_bot['precio']}</h2>
-        <h2>RSI: {data_bot['rsi']}</h2>
-        <h2>{data_bot['estado']}</h2>
-        <script>setTimeout(function(){{ location.reload(); }}, 20000);</script>
-    </body>
-    """
-
-threading.Thread(target=motor, daemon=True).start()
-
-if __name__ == "__main__":
-    port = int(os.environ.get("PORT", 10000))
-    app.run(host="0.0.0.0", port=port)
+# 🔥 ARRANQUE FORZADO (IMPORTANTE)
+def start_bot():
