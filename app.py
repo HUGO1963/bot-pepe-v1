@@ -33,12 +33,16 @@ en_posicion = False
 # RSI
 def calcular_rsi(cierres, periodo=14):
     delta = cierres.diff()
+
     ganancia = delta.clip(lower=0)
     perdida = -delta.clip(upper=0)
+
     media_ganancia = ganancia.rolling(window=periodo).mean()
     media_perdida = perdida.rolling(window=periodo).mean()
+
     rs = media_ganancia / media_perdida
     rsi = 100 - (100 / (1 + rs))
+
     return rsi.iloc[-1]
 
 # MOTOR
@@ -54,10 +58,10 @@ def motor():
             bars = exchange.fetch_ohlcv(SYMBOL, timeframe=TIMEFRAME, limit=50)
             df = pd.DataFrame(bars, columns=['t','o','h','l','c','v'])
 
-            precio = df['c'].iloc[-1]
+            precio = float(df['c'].iloc[-1])
             rsi = calcular_rsi(df['c'])
 
-            # Evita errores iniciales
+            # Evita RSI inválido
             if pd.isna(rsi):
                 time.sleep(30)
                 continue
@@ -75,7 +79,7 @@ def motor():
                         exchange.create_market_sell_order(SYMBOL, pepe)
                         en_posicion = False
                         data_bot["estado"] = "SALIO DEL RANGO - VENDIDO"
-                    except:
+                    except Exception as e:
                         data_bot["estado"] = "ERROR VENTA FUERA RANGO"
 
             else:
@@ -86,7 +90,7 @@ def motor():
                         exchange.create_market_buy_order(SYMBOL, cantidad)
                         en_posicion = True
                         data_bot["estado"] = "COMPRADO"
-                    except:
+                    except Exception as e:
                         data_bot["estado"] = "ERROR COMPRA"
 
                 # VENTA
@@ -95,13 +99,13 @@ def motor():
                         exchange.create_market_sell_order(SYMBOL, pepe)
                         en_posicion = False
                         data_bot["estado"] = "VENDIDO"
-                    except:
+                    except Exception as e:
                         data_bot["estado"] = "ERROR VENTA"
 
                 else:
                     data_bot["estado"] = "EN RANGO - ESPERANDO"
 
-        except:
+        except Exception as e:
             data_bot["estado"] = "ERROR GENERAL"
 
         time.sleep(30)
