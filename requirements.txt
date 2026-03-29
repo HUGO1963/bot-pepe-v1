@@ -1,4 +1,5 @@
-python-binance
-pandas
 flask
+ccxt
+pandas
+pandas_ta
 gunicorn
