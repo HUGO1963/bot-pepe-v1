@@ -7,28 +7,17 @@ from flask import Flask
 
 app = Flask(__name__)
 
-# API (COINEX)
-API_KEY = '0CD4EAE1BBAA4628B65AAB8660D8278F'
-API_SECRET = '4C7C6BF5D2A82687085E95C28A8A548237800D11FDF4A4C5'
-
-exchange = ccxt.coinex({
-    'apiKey': API_KEY,
-    'secret': API_SECRET,
+# ⚠️ SIN API (MODO SEGURO)
+exchange = ccxt.binance({
     'enableRateLimit': True,
 })
 
-# CONFIGURACIÓN (MODO PRUEBA)
-SYMBOL = 'BTC/USDT'   # 👈 SOLO TEST
+# CONFIG
+SYMBOL = 'BTC/USDT'
 TIMEFRAME = '1m'
-MONTO_USDT = 5
-
-# RANGO
-PRECIO_MIN = 0
-PRECIO_MAX = 999999999
 
 # ESTADO
-data_bot = {"precio": 0, "rsi": 0, "estado": "Iniciando...", "saldo": 0}
-en_posicion = False
+data_bot = {"precio": 0, "rsi": 0, "estado": "Iniciando..."}
 
 # RSI
 def calcular_rsi(cierres, periodo=14):
@@ -43,13 +32,8 @@ def calcular_rsi(cierres, periodo=14):
 
 # MOTOR
 def motor():
-    global en_posicion
-
     while True:
         try:
-            balance = exchange.fetch_balance()
-            usdt = balance['free'].get('USDT', 0)
-
             bars = exchange.fetch_ohlcv(SYMBOL, timeframe=TIMEFRAME, limit=50)
             df = pd.DataFrame(bars, columns=['t','o','h','l','c','v'])
 
@@ -57,42 +41,38 @@ def motor():
             rsi_val = calcular_rsi(df['c'])
 
             if pd.isna(rsi_val):
-                data_bot["estado"] = "Calculando indicadores..."
+                data_bot["estado"] = "Calculando..."
                 time.sleep(10)
                 continue
 
             data_bot["precio"] = precio
             data_bot["rsi"] = round(rsi_val, 2)
-            data_bot["saldo"] = round(usdt, 4)
 
-            # SOLO SEÑALES (NO OPERA)
             if rsi_val <= 30:
-                data_bot["estado"] = "SEÑAL DE COMPRA (RSI BAJO)"
+                data_bot["estado"] = "SEÑAL COMPRA"
             elif rsi_val >= 70:
-                data_bot["estado"] = "SEÑAL DE VENTA (RSI ALTO)"
+                data_bot["estado"] = "SEÑAL VENTA"
             else:
-                data_bot["estado"] = "ESPERANDO SEÑAL"
+                data_bot["estado"] = "ESPERANDO"
 
         except Exception as e:
             data_bot["estado"] = str(e)
 
-        time.sleep(30)
+        time.sleep(20)
 
 # WEB
 @app.route('/')
 def home():
     return f"""
     <body style="background-color:black; color:#00FF00; font-family:monospace; text-align:center; padding-top:50px;">
-        <h1 style="color:gold;">🦅 AGUILA BOT - TEST</h1>
-        <h2>PRECIO: {data_bot['precio']}</h2>
+        <h1 style="color:gold;">🦅 AGUILA BOT - SEGURO</h1>
+        <h2>PRECIO BTC: {data_bot['precio']}</h2>
         <h2>RSI: {data_bot['rsi']}</h2>
         <h2>{data_bot['estado']}</h2>
-        <h3>USDT: {data_bot['saldo']}</h3>
         <script>setTimeout(function(){{ location.reload(); }}, 20000);</script>
     </body>
     """
 
-# INICIO
 threading.Thread(target=motor, daemon=True).start()
 
 if __name__ == "__main__":
