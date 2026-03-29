@@ -1,4 +1,5 @@
 flask
 ccxt
 pandas
+pandas-ta
 gunicorn
