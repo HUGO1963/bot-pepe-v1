@@ -18,7 +18,7 @@ exchange = ccxt.coinex({
 })
 
 # CONFIGURACIÓN
-SYMBOL = 'PEPE/USDT'
+SYMBOL = '1000PEPE/USDT'
 TIMEFRAME = '1m'
 MONTO_USDT = 5
 
