@@ -17,16 +17,16 @@ exchange = ccxt.coinex({
     'enableRateLimit': True,
 })
 
-# CONFIGURACIÓN
-SYMBOL = '1000PEPE/USDT'
+# CONFIGURACIÓN (MODO PRUEBA)
+SYMBOL = 'BTC/USDT'   # 👈 SOLO TEST
 TIMEFRAME = '1m'
 MONTO_USDT = 5
 
-# RANGO DE OPERACIÓN
-PRECIO_MIN = 0.00000850
-PRECIO_MAX = 0.00001250
+# RANGO
+PRECIO_MIN = 0
+PRECIO_MAX = 999999999
 
-# ESTADO DEL BOT
+# ESTADO
 data_bot = {"precio": 0, "rsi": 0, "estado": "Iniciando...", "saldo": 0}
 en_posicion = False
 
@@ -49,7 +49,6 @@ def motor():
         try:
             balance = exchange.fetch_balance()
             usdt = balance['free'].get('USDT', 0)
-            pepe = balance['free'].get('PEPE', 0)
 
             bars = exchange.fetch_ohlcv(SYMBOL, timeframe=TIMEFRAME, limit=50)
             df = pd.DataFrame(bars, columns=['t','o','h','l','c','v'])
@@ -66,39 +65,13 @@ def motor():
             data_bot["rsi"] = round(rsi_val, 2)
             data_bot["saldo"] = round(usdt, 4)
 
-            # CONTROL DE RANGO
-            if precio < PRECIO_MIN or precio > PRECIO_MAX:
-                data_bot["estado"] = "FUERA DE RANGO - PROTECCIÓN"
-
-                if en_posicion and pepe > 0:
-                    try:
-                        exchange.create_market_sell_order(SYMBOL, pepe)
-                        en_posicion = False
-                        data_bot["estado"] = "VENTA FUERA RANGO"
-                    except:
-                        data_bot["estado"] = "ERROR VENTA RANGO"
-
+            # SOLO SEÑALES (NO OPERA)
+            if rsi_val <= 30:
+                data_bot["estado"] = "SEÑAL DE COMPRA (RSI BAJO)"
+            elif rsi_val >= 70:
+                data_bot["estado"] = "SEÑAL DE VENTA (RSI ALTO)"
             else:
-                # RSI 30 / 70
-                if rsi_val <= 30 and not en_posicion and usdt >= MONTO_USDT:
-                    cantidad = MONTO_USDT / precio
-                    try:
-                        exchange.create_market_buy_order(SYMBOL, cantidad)
-                        en_posicion = True
-                        data_bot["estado"] = "COMPRADO"
-                    except:
-                        data_bot["estado"] = "ERROR COMPRA"
-
-                elif rsi_val >= 70 and en_posicion and pepe > 0:
-                    try:
-                        exchange.create_market_sell_order(SYMBOL, pepe)
-                        en_posicion = False
-                        data_bot["estado"] = "VENDIDO"
-                    except:
-                        data_bot["estado"] = "ERROR VENTA"
-
-                else:
-                    data_bot["estado"] = "EN RANGO - CAZANDO"
+                data_bot["estado"] = "ESPERANDO SEÑAL"
 
         except Exception as e:
             data_bot["estado"] = str(e)
@@ -110,13 +83,11 @@ def motor():
 def home():
     return f"""
     <body style="background-color:black; color:#00FF00; font-family:monospace; text-align:center; padding-top:50px;">
-        <h1 style="color:gold;">🦅 AGUILA BOT - COINEX</h1>
-        <hr style="width:50%; border:1px solid #333;">
-        <h2 style="font-size:32px;">PRECIO PEPE: {data_bot['precio']:.8f}</h2>
-        <h2 style="color:lawngreen;">RSI: {data_bot['rsi']}</h2>
-        <h2 style="background-color:#222; padding:15px; border-radius:10px; display:inline-block;">{data_bot['estado']}</h2>
-        <h3>DISPONIBLE: {data_bot['saldo']} USDT</h3>
-        <p style="color:#666;">RANGO: {PRECIO_MIN:.8f} - {PRECIO_MAX:.8f}</p>
+        <h1 style="color:gold;">🦅 AGUILA BOT - TEST</h1>
+        <h2>PRECIO: {data_bot['precio']}</h2>
+        <h2>RSI: {data_bot['rsi']}</h2>
+        <h2>{data_bot['estado']}</h2>
+        <h3>USDT: {data_bot['saldo']}</h3>
         <script>setTimeout(function(){{ location.reload(); }}, 20000);</script>
     </body>
     """
