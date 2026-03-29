@@ -7,7 +7,7 @@ from flask import Flask
 
 app = Flask(__name__)
 
-# SIN API (modo seguro)
+# EXCHANGE SEGURO (sin API)
 exchange = ccxt.binance({
     'enableRateLimit': True,
 })
@@ -53,12 +53,31 @@ def motor():
             elif rsi_val >= 70:
                 data_bot["estado"] = "SEÑAL VENTA"
             else:
-                data_bot["estado"] = "ESPERANDO"
+                data_bot["estado"] = "EN ESPERA"
 
         except Exception as e:
             data_bot["estado"] = "ERROR: " + str(e)
 
-        time.sleep(20)
+        time.sleep(15)
 
-# 🔥 ARRANQUE FORZADO (IMPORTANTE)
-def start_bot():
+# 🔥 ARRANQUE AUTOMÁTICO (SIN before_first_request)
+hilo = threading.Thread(target=motor)
+hilo.daemon = True
+hilo.start()
+
+# WEB
+@app.route('/')
+def home():
+    return f"""
+    <body style="background-color:black; color:#00FF00; font-family:monospace; text-align:center; padding-top:50px;">
+        <h1 style="color:gold;">🦅 AGUILA BOT - OK</h1>
+        <h2>PRECIO BTC: {data_bot['precio']}</h2>
+        <h2>RSI: {data_bot['rsi']}</h2>
+        <h2>{data_bot['estado']}</h2>
+        <script>setTimeout(function(){{ location.reload(); }}, 10000);</script>
+    </body>
+    """
+
+if __name__ == "__main__":
+    port = int(os.environ.get("PORT", 10000))
+    app.run(host="0.0.0.0", port=port)
