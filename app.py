@@ -1,39 +1,88 @@
 import time, threading, os, ccxt, pandas as pd
 from flask import Flask
+
 app = Flask(__name__)
 
 # --- CONFIGURACIÓN COINEX ---
-API_KEY = '0CD4EAE1BBAA4628B65AAB8660D8278F'
-API_SECRET = '4C7C6BF5D2A82687085E95C28A8A548237800D11FDF4A4C5'
+API_KEY = '8D9B0B4872544713BB5987467562E601'
+API_SECRET = 'B8A35FC096757EE430B005A1D4BFE4B7399BF075CCF1E5E4'
 
-exchange = ccxt.coinex({'apiKey': API_KEY, 'secret': API_SECRET, 'enableRateLimit': True})
-SYMBOL, TIMEFRAME = '1000PEPE/USDT', '1m'
-data_bot = {"precio": 0, "rsi": 0, "estado": "Iniciando...", "saldo": 0}
+# Conexión con el mercado
+exchange = ccxt.coinex({
+    'apiKey': API_KEY, 
+    'secret': API_SECRET, 
+    'enableRateLimit': True,
+    'options': {'defaultType': 'swap'}  # Esto es para que entre a FUTUROS
+})
 
+SYMBOL = '1000PEPE/USDT'
+TIMEFRAME = '1m'
+
+# Datos en tiempo real para la pantalla
+data_bot = {
+    "precio": 0,
+    "rsi": 0,
+    "estado": "Iniciando Águila...",
+    "saldo": 0,
+    "posicion": "Ninguna"
+}
+
+# --- MOTOR DE TRADING (LÓGICA DEL ÁGUILA) ---
 def motor():
     while True:
         try:
+            # 1. Ver Saldo Real
             balance = exchange.fetch_balance()
-            data_bot["saldo"] = round(balance['free'].get('USDT', 0), 2)
+            data_bot["saldo"] = round(balance['total'].get('USDT', 0), 2)
+
+            # 2. Calcular RSI
             bars = exchange.fetch_ohlcv(SYMBOL, timeframe=TIMEFRAME, limit=50)
             df = pd.DataFrame(bars, columns=['t','o','h','l','c','v'])
-            data_bot["precio"] = df['c'].iloc[-1]
             delta = df['c'].diff()
-            gan, per = delta.clip(lower=0).rolling(14).mean(), -delta.clip(upper=0).rolling(14).mean()
-            data_bot["rsi"] = round(100 - (100 / (1 + (gan/per))).iloc[-1], 2)
-            data_bot["estado"] = "🦅 CAZANDO EN 1000PEPE"
-        except: data_bot["estado"] = "ERROR: Revisar Conexión"
-        time.sleep(15)
+            gain = (delta.where(delta > 0, 0)).rolling(window=14).mean()
+            loss = (-delta.where(delta < 0, 0)).rolling(window=14).mean()
+            rs = gain / loss
+            rsi = 100 - (100 / (1 + rs))
+            
+            data_bot["precio"] = df['c'].iloc[-1]
+            data_bot["rsi"] = round(rsi.iloc[-1], 2)
 
+            # 3. Decidir qué hacer
+            actual_rsi = data_bot["rsi"]
+            if actual_rsi < 30:
+                data_bot["estado"] = "🔥 RSI BAJO: ¡Oportunidad de COMPRA!"
+            elif actual_rsi > 70:
+                data_bot["estado"] = "🧊 RSI ALTO: ¡Zona de VENTA!"
+            else:
+                data_bot["estado"] = "🦅 Vigilando... Esperando momento justo."
+
+        except Exception as e:
+            data_bot["estado"] = f"Reconectando... ({e})"
+        
+        time.sleep(30)
+
+# Lanzar el motor en segundo plano
+threading.Thread(target=motor, daemon=True).start()
+
+# --- PANTALLA DEL BOT ---
 @app.route('/')
 def home():
-    return f"""<body style="background:black;color:#00FF00;text-align:center;font-family:monospace;">
-    <h1 style="color:gold;">🦅 AGUILA BOT</h1>
-    <h2>PRECIO: {data_bot['precio']:.8f} | RSI: {data_bot['rsi']}</h2>
-    <h2 style="background:#222;display:inline-block;padding:10px;">{data_bot['estado']}</h2>
-    <h3>DISPONIBLE: {data_bot['saldo']} USDT</h3>
-    <script>setTimeout(()=>location.reload(), 12000);</script></body>"""
+    color = "red" if data_bot["rsi"] > 70 else "green" if data_bot["rsi"] < 30 else "white"
+    return f"""
+    <body style="background:#121212; color:white; font-family:sans-serif; text-align:center; padding-top:50px;">
+        <h1 style="color:#00ff00;">🦅 AGUILA BOT v1.0</h1>
+        <hr style="width:300px; border:1px solid #333;">
+        <div style="font-size:1.5em; margin:20px;">
+            <p>💰 DISPONIBLE: <span style="color:yellow;">{data_bot['saldo']} USDT</span></p>
+            <p>📈 PRECIO PEPE: {data_bot['precio']}</p>
+            <p>📊 RSI (14): <span style="color:{color};">{data_bot['rsi']}</span></p>
+        </div>
+        <hr style="width:300px; border:1px solid #333;">
+        <h3>ESTADO ACTUAL:</h3>
+        <p style="background:#333; display:inline-block; padding:10px; border-radius:5px;">{data_bot['estado']}</p>
+    </body>
+    """
 
-threading.Thread(target=motor, daemon=True).start()
 if __name__ == "__main__":
-    app.run(host="0.0.0.0", port=int(os.environ.get("PORT", 10000)))
+    port = int(os.environ.get("PORT", 5000))
+    app.run(host="0.0.0.0", port=port)
