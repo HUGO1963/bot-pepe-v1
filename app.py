@@ -7,17 +7,22 @@ from flask import Flask
 
 app = Flask(__name__)
 
-# EXCHANGE SEGURO (sin API)
-exchange = ccxt.binance({
+# --- CONFIGURACIÓN COINEX ---
+API_KEY = '0CD4EAE1BBAA4628B65AAB8660D8278F'
+API_SECRET = '4C7C6BF5D2A82687085E95C28A8A548237800D11FDF4A4C5'
+
+exchange = ccxt.coinex({
+    'apiKey': API_KEY,
+    'secret': API_SECRET,
     'enableRateLimit': True,
 })
 
-SYMBOL = 'BTC/USDT'
+# --- EL PAR CORRECTO ---
+SYMBOL = '1000PEPE/USDT' 
 TIMEFRAME = '1m'
 
-data_bot = {"precio": 0, "rsi": 0, "estado": "Iniciando..."}
+data_bot = {"precio": 0, "rsi": 0, "estado": "Iniciando...", "saldo": 0}
 
-# RSI
 def calcular_rsi(cierres, periodo=14):
     delta = cierres.diff()
     ganancia = delta.clip(lower=0)
@@ -25,58 +30,45 @@ def calcular_rsi(cierres, periodo=14):
     media_ganancia = ganancia.rolling(window=periodo).mean()
     media_perdida = perdida.rolling(window=periodo).mean()
     rs = media_ganancia / media_perdida
-    rsi = 100 - (100 / (1 + rs))
-    return rsi.iloc[-1]
+    return 100 - (100 / (1 + rs)).iloc[-1]
 
-# MOTOR
 def motor():
     while True:
         try:
-            data_bot["estado"] = "Conectando..."
-
+            # Traer tu saldo de 12.51 USDT
+            balance = exchange.fetch_balance()
+            data_bot["saldo"] = round(balance['free'].get('USDT', 0), 2)
+            
+            # Mercado
             bars = exchange.fetch_ohlcv(SYMBOL, timeframe=TIMEFRAME, limit=50)
             df = pd.DataFrame(bars, columns=['t','o','h','l','c','v'])
-
-            precio = float(df['c'].iloc[-1])
+            precio = df['c'].iloc[-1]
             rsi_val = calcular_rsi(df['c'])
-
-            if pd.isna(rsi_val):
-                data_bot["estado"] = "Calculando..."
-                time.sleep(5)
-                continue
 
             data_bot["precio"] = precio
             data_bot["rsi"] = round(rsi_val, 2)
-
-            if rsi_val <= 30:
-                data_bot["estado"] = "SEÑAL COMPRA"
-            elif rsi_val >= 70:
-                data_bot["estado"] = "SEÑAL VENTA"
-            else:
-                data_bot["estado"] = "EN ESPERA"
+            data_bot["estado"] = "🦅 CAZANDO EN 1000PEPE"
 
         except Exception as e:
-            data_bot["estado"] = "ERROR: " + str(e)
-
+            data_bot["estado"] = "ERROR: Revisar Conexión"
         time.sleep(15)
 
-# 🔥 ARRANQUE AUTOMÁTICO (SIN before_first_request)
-hilo = threading.Thread(target=motor)
-hilo.daemon = True
-hilo.start()
-
-# WEB
 @app.route('/')
 def home():
     return f"""
     <body style="background-color:black; color:#00FF00; font-family:monospace; text-align:center; padding-top:50px;">
-        <h1 style="color:gold;">🦅 AGUILA BOT - OK</h1>
-        <h2>PRECIO BTC: {data_bot['precio']}</h2>
-        <h2>RSI: {data_bot['rsi']}</h2>
-        <h2>{data_bot['estado']}</h2>
+        <h1 style="color:gold;">🦅 AGUILA BOT - COINEX</h1>
+        <hr style="width:50%; border:1px solid #333; margin:auto;">
+        <h2 style="font-size:32px;">PRECIO PEPE: {data_bot['precio']:.8f}</h2>
+        <h2 style="color:lawngreen;">RSI: {data_bot['rsi']}</h2>
+        <h2 style="background-color:#222; padding:15px; border-radius:10px; display:inline-block;">{data_bot['estado']}</h2>
+        <br><br>
+        <h3 style="color:white;">DISPONIBLE: {data_bot['saldo']} USDT</h3>
         <script>setTimeout(function(){{ location.reload(); }}, 10000);</script>
     </body>
     """
+
+threading.Thread(target=motor, daemon=True).start()
 
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 10000))
