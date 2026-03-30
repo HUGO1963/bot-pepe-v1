@@ -4,38 +4,37 @@ from flask import Flask
 app = Flask(__name__)
 
 # --- CONFIGURACIÓN COINEX ---
+# Estas son tus llaves nuevas con permiso de LEER y TRADEAR
 API_KEY = '8D9B0B4872544713BB5987467562E601'
 API_SECRET = 'B8A35FC096757EE430B005A1D4BFE4B7399BF075CCF1E5E4'
 
-# Conexión con el mercado
+# Conexión con el mercado (Modo Swaps para ver tus USDT de futuros)
 exchange = ccxt.coinex({
     'apiKey': API_KEY, 
     'secret': API_SECRET, 
     'enableRateLimit': True,
-    'options': {'defaultType': 'swap'}  # Esto es para que entre a FUTUROS
+    'options': {'defaultType': 'swap'}
 })
 
 SYMBOL = '1000PEPE/USDT'
 TIMEFRAME = '1m'
 
-# Datos en tiempo real para la pantalla
 data_bot = {
     "precio": 0,
     "rsi": 0,
     "estado": "Iniciando Águila...",
-    "saldo": 0,
-    "posicion": "Ninguna"
+    "saldo": 0
 }
 
-# --- MOTOR DE TRADING (LÓGICA DEL ÁGUILA) ---
+# --- MOTOR DE TRADING ---
 def motor():
     while True:
         try:
-            # 1. Ver Saldo Real
+            # 1. Actualizar Saldo Real
             balance = exchange.fetch_balance()
             data_bot["saldo"] = round(balance['total'].get('USDT', 0), 2)
 
-            # 2. Calcular RSI
+            # 2. Calcular RSI y Precio
             bars = exchange.fetch_ohlcv(SYMBOL, timeframe=TIMEFRAME, limit=50)
             df = pd.DataFrame(bars, columns=['t','o','h','l','c','v'])
             delta = df['c'].diff()
@@ -46,28 +45,18 @@ def motor():
             
             data_bot["precio"] = df['c'].iloc[-1]
             data_bot["rsi"] = round(rsi.iloc[-1], 2)
-
-            # 3. Decidir qué hacer
-            actual_rsi = data_bot["rsi"]
-            if actual_rsi < 30:
-                data_bot["estado"] = "🔥 RSI BAJO: ¡Oportunidad de COMPRA!"
-            elif actual_rsi > 70:
-                data_bot["estado"] = "🧊 RSI ALTO: ¡Zona de VENTA!"
-            else:
-                data_bot["estado"] = "🦅 Vigilando... Esperando momento justo."
+            data_bot["estado"] = "🦅 Vigilando el mercado..."
 
         except Exception as e:
-            data_bot["estado"] = f"Reconectando... ({e})"
+            data_bot["estado"] = f"Error: {e}"
         
         time.sleep(30)
 
-# Lanzar el motor en segundo plano
 threading.Thread(target=motor, daemon=True).start()
 
-# --- PANTALLA DEL BOT ---
+# --- INTERFAZ VISUAL ---
 @app.route('/')
 def home():
-    color = "red" if data_bot["rsi"] > 70 else "green" if data_bot["rsi"] < 30 else "white"
     return f"""
     <body style="background:#121212; color:white; font-family:sans-serif; text-align:center; padding-top:50px;">
         <h1 style="color:#00ff00;">🦅 AGUILA BOT v1.0</h1>
@@ -75,11 +64,9 @@ def home():
         <div style="font-size:1.5em; margin:20px;">
             <p>💰 DISPONIBLE: <span style="color:yellow;">{data_bot['saldo']} USDT</span></p>
             <p>📈 PRECIO PEPE: {data_bot['precio']}</p>
-            <p>📊 RSI (14): <span style="color:{color};">{data_bot['rsi']}</span></p>
+            <p>📊 RSI (14): {data_bot['rsi']}</p>
         </div>
-        <hr style="width:300px; border:1px solid #333;">
-        <h3>ESTADO ACTUAL:</h3>
-        <p style="background:#333; display:inline-block; padding:10px; border-radius:5px;">{data_bot['estado']}</p>
+        <p>ESTADO: {data_bot['estado']}</p>
     </body>
     """
 
