@@ -8,6 +8,7 @@ from flask import Flask
 app = Flask(__name__)
 
 # --- CONFIGURACIÓN COINEX ---
+# Tus llaves ya están puestas
 API_KEY = '0CD4EAE1BBAA4628B65AAB8660D8278F'
 API_SECRET = '4C7C6BF5D2A82687085E95C28A8A548237800D11FDF4A4C5'
 
@@ -17,7 +18,7 @@ exchange = ccxt.coinex({
     'enableRateLimit': True,
 })
 
-# --- EL PAR CORRECTO ---
+# --- EL PAR CORRECTO SEGÚN COINEX ---
 SYMBOL = '1000PEPE/USDT' 
 TIMEFRAME = '1m'
 
@@ -35,11 +36,11 @@ def calcular_rsi(cierres, periodo=14):
 def motor():
     while True:
         try:
-            # Traer tu saldo de 12.51 USDT
+            # Traer saldo real de tu cuenta
             balance = exchange.fetch_balance()
             data_bot["saldo"] = round(balance['free'].get('USDT', 0), 2)
             
-            # Mercado
+            # Traer datos de mercado con el nombre 1000PEPE
             bars = exchange.fetch_ohlcv(SYMBOL, timeframe=TIMEFRAME, limit=50)
             df = pd.DataFrame(bars, columns=['t','o','h','l','c','v'])
             precio = df['c'].iloc[-1]
@@ -50,7 +51,7 @@ def motor():
             data_bot["estado"] = "🦅 CAZANDO EN 1000PEPE"
 
         except Exception as e:
-            data_bot["estado"] = "ERROR: Revisar Conexión"
+            data_bot["estado"] = "ERROR: Símbolo no encontrado"
         time.sleep(15)
 
 @app.route('/')
@@ -59,11 +60,12 @@ def home():
     <body style="background-color:black; color:#00FF00; font-family:monospace; text-align:center; padding-top:50px;">
         <h1 style="color:gold;">🦅 AGUILA BOT - COINEX</h1>
         <hr style="width:50%; border:1px solid #333; margin:auto;">
-        <h2 style="font-size:32px;">PRECIO PEPE: {data_bot['precio']:.8f}</h2>
-        <h2 style="color:lawngreen;">RSI: {data_bot['rsi']}</h2>
+        <br>
+        <h2 style="font-size:32px;">PRECIO 1000PEPE: {data_bot['precio']:.8f}</h2>
+        <h2 style="color:lawngreen; font-size:28px;">RSI: {data_bot['rsi']}</h2>
         <h2 style="background-color:#222; padding:15px; border-radius:10px; display:inline-block;">{data_bot['estado']}</h2>
         <br><br>
-        <h3 style="color:white;">DISPONIBLE: {data_bot['saldo']} USDT</h3>
+        <h3 style="color:white; font-size:24px;">DISPONIBLE: {data_bot['saldo']} USDT</h3>
         <script>setTimeout(function(){{ location.reload(); }}, 10000);</script>
     </body>
     """
